@@ -1,0 +1,5 @@
+https://colah.github.io/posts/2015-08-Understanding-LSTMs/
+https://lilianweng.github.io/posts/2018-06-24-attention/
+https://jalammar.github.io/illustrated-transformer/
+https://lilianweng.github.io/posts/2017-10-29-object-recognition/
+https://huyenchip.com/2022/01/02/real-time-machine-learning-challenges-and-solutions.html

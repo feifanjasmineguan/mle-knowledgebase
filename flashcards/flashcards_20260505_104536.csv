@@ -1,0 +1,248 @@
+Front,Back,Tags,Source
+What are the two main challenges in real-time machine learning?,"1. **Online prediction**: Generating predictions on-demand with fresh, real-time data (rather than precomputed batch predictions)
+2. **Continual learning**: Continuously updating models in response to changing data distributions rather than on fixed schedules
+
+Both are fundamentally infrastructure problems requiring streaming systems, feature stores, and model management.",real-time-ml online-prediction continual-learning,real_time_machine_learning_challenges_and_solutions
+What are the 3 stages of online prediction?,"**Stage 1 – Batch Prediction**: Predictions precomputed at fixed intervals; retrieved at request time; stale between batch jobs
+
+**Stage 2 – Online Prediction with Batch Features**: Predictions generated after request arrives; uses pre-computed embeddings looked up in real-time; minimal streaming overhead
+
+**Stage 3 – Online Prediction with Online Features**: Uses both historical batch features AND fresh online features (real-time or near real-time) at prediction time; hundreds to thousands of features possible",real-time-ml online-prediction system-design,real_time_machine_learning_challenges_and_solutions
+What is the difference between real-time features and near real-time features?,"**Real-time (RT) features**:
+- Computed *synchronously* at prediction time
+- Very fresh (milliseconds old)
+- Hard to scale; computation latency directly adds to user-facing latency
+
+**Near real-time features**:
+- Precomputed *asynchronously* via streaming pipelines
+- Staleness ~seconds
+- Scalable; complex features are feasible since latency isn't constrained
+- **Preferred approach** in production systems
+
+Key tradeoff: freshness vs. latency/scalability",real-time-ml feature-engineering system-design,real_time_machine_learning_challenges_and_solutions
+"What are the 4 stages of continual learning, and what distinguishes each?","**Stage 1 – Manual, Stateless Retraining**: Ad-hoc updates when performance degrades; full retrain from scratch; common in early-stage ML adoption
+
+**Stage 2 – Automated Retraining**: Scheduler-driven (Cron/Airflow); still stateless; frequency often intuition-based, not data-driven
+
+**Stage 3 – Automated, Stateful Training**: Fine-tuning on new data instead of retraining from scratch; dramatically reduces cost (e.g., 45x reduction at Grubhub); requires model lineage tracking
+
+**Stage 4 – Continual Learning**: Updates triggered by schedule, performance degradation, or data drift detection; adapts dynamically; holy grail includes edge deployment",continual-learning model-training mlops,real_time_machine_learning_challenges_and_solutions
+"What is stateful vs. stateless model training, and why does it matter?","**Stateless retraining**: Model trained from scratch each cycle on historical + new data
+- Dominant/simpler approach
+- Expensive; requires large datasets each cycle
+
+**Stateful training (fine-tuning)**: Model continues learning from its last checkpoint on new data only
+- Dramatically cheaper (Grubhub: 45x cost reduction)
+- Requires fewer data samples per update
+- Enables data privacy (samples only needed at prediction + training time)
+- Requires model lineage tracking and reproducible streaming features
+
+Stateful training is a prerequisite for true continual learning.",continual-learning model-training fine-tuning,real_time_machine_learning_challenges_and_solutions
+How do bandit algorithms improve upon A/B testing for model evaluation?,"**A/B testing** is stateless: traffic split is fixed; requires large samples for significance (e.g., 630K samples for 95% confidence)
+
+**Bandit-based evaluation** is stateful: dynamically routes more traffic to the better-performing model during evaluation
+- Much more data-efficient (Google study: Thompson Sampling needed only ~12K samples vs. 630K)
+- Reduces opportunity cost of exposing users to worse models
+
+**Requirements**: Online prediction infrastructure, short feedback loops, performance tracking
+
+**Limitation**: Rarely adopted outside big tech due to implementation complexity",bandits model-evaluation ab-testing real-time-ml,real_time_machine_learning_challenges_and_solutions
+What is the role of contextual bandits in real-time ML recommendations?,"**Contextual bandits** balance:
+- **Exploitation**: Show items the model believes the user will like (maximizes short-term reward)
+- **Exploration**: Test less-popular or uncertain items (gathers new signal, avoids feedback loops)
+
+**Use case**: Optimizing individual prediction actions (e.g., which item to recommend)
+
+**Why it matters**: Pure exploitation creates feedback loops where already-popular items get more exposure, biasing future training data
+
+**Limitation**: Hard to implement; depends on model architecture; well-researched but underdeployed in industry",bandits recommendations exploration-exploitation real-time-ml,real_time_machine_learning_challenges_and_solutions
+What infrastructure components are required to move from batch to online prediction (Stage 2+)?,"**1. Streaming Transport** (e.g., Kafka, AWS Kinesis, GCP Pub/Sub)
+- Moves real-time user activity events to the prediction service
+- Most companies prefer managed services
+
+**2. Streaming Computation Engine** (e.g., Flink, Spark Streaming)
+- Computes near real-time features asynchronously from event streams
+
+**3. Feature Store**
+- Stores and serves both batch and near real-time features at low latency
+
+**4. Model Store / Registry**
+- Versions model code and artifacts; required for automated retraining and stateful training
+
+Without these, teams are limited to batch prediction or simple embedding lookups.",real-time-ml infrastructure system-design mlops,real_time_machine_learning_challenges_and_solutions
+Why do standard RNNs fail on long sequences?,"The vanishing gradient problem: during backpropagation through time, gradients are multiplied repeatedly across many time steps. With long sequences, these gradients shrink (or explode) exponentially, making it impossible for the network to learn dependencies between distant time steps. Practically, standard RNNs can only leverage context from a few steps back.",lstm rnn vanishing-gradient sequence-modeling,understanding_lstm_networks_colah_s_blog
+What is the LSTM cell state and why is it important?,"The cell state (Ct) is a 'conveyor belt' running horizontally through the entire LSTM chain. It carries long-term information across many time steps with only minor linear interactions. It is modified through additive updates (not multiplicative), which allows gradients to flow backward with minimal degradation — this is the core mechanism that solves the vanishing gradient problem.",lstm cell-state long-term-memory,understanding_lstm_networks_colah_s_blog
+What are the three gates in an LSTM and what does each do?,"1. **Forget gate (ft)**: Decides what to discard from the cell state. ft = σ(Wf · [h_{t-1}, xt] + bf)
+2. **Input gate (it)**: Decides which new values to add to the cell state, paired with a tanh candidate layer C̃t.
+3. **Output gate (ot)**: Filters cell state information to produce the hidden state output.
+
+All gates use sigmoid (output 0–1) to perform soft selection of information.",lstm gates architecture,understanding_lstm_networks_colah_s_blog
+What is the LSTM cell state update equation and why does it prevent vanishing gradients?,"C_t = f_t * C_{t-1} + i_t * C̃_t
+
+The update is **additive**: old information is scaled by the forget gate and new information is added. This additive combination allows gradients to flow backward through the cell state without repeated multiplication shrinking them — unlike standard RNNs where information is transformed purely multiplicatively at each step.",lstm cell-state vanishing-gradient equations,understanding_lstm_networks_colah_s_blog
+What is the difference between the LSTM cell state and the hidden state?,"- **Cell state (Ct)**: Long-term memory. Carries information across many time steps with minimal modification. Not directly exposed as output.
+- **Hidden state (ht)**: Short-term, filtered output computed as ht = ot * tanh(Ct). The output gate decides what portion of the cell state to expose, and tanh normalizes values to [-1, 1]. The hidden state is passed to the next time step and used as the network's output.",lstm cell-state hidden-state architecture,understanding_lstm_networks_colah_s_blog
+Why is sigmoid used for LSTM gates instead of other activation functions?,"Sigmoid outputs values in [0, 1], which directly represents a 'keep vs. discard' proportion — 0 means completely block information, 1 means completely pass it through. This makes gates interpretable as soft on/off switches. Other activations like tanh output [-1, 1] (used for candidate values, not gating) and ReLU outputs [0, ∞), which don't naturally represent a bounded proportion.",lstm gates sigmoid activation-functions,understanding_lstm_networks_colah_s_blog
+What is a GRU and how does it differ from an LSTM?,"A Gated Recurrent Unit (GRU, Cho et al. 2014) is a simplified LSTM with:
+- **2 gates** (update + reset) instead of 3
+- **No separate cell state** — cell state and hidden state are merged
+- **Coupled forget/input** — a single update gate handles both forgetting and inputting
+
+GRUs are computationally more efficient with comparable performance to LSTMs. They are preferred when simplicity or speed matters, while LSTMs may have an edge on tasks requiring fine-grained memory control.",gru lstm variants architecture,understanding_lstm_networks_colah_s_blog
+Walk through the four phases of LSTM operation at a single time step.,"1. **Forget**: ft = σ(Wf · [h_{t-1}, xt] + bf) — decide what to remove from cell state
+2. **Input**: it = σ(Wi · [h_{t-1}, xt] + bi) and C̃t = tanh(Wc · [h_{t-1}, xt] + bc) — decide what new info to add
+3. **Update**: Ct = ft * C_{t-1} + it * C̃t — modify cell state by forgetting old and adding new
+4. **Output**: ot = σ(Wo · [h_{t-1}, xt] + bo), ht = ot * tanh(Ct) — filter cell state into hidden state output",lstm equations architecture step-by-step,understanding_lstm_networks_colah_s_blog
+What problem did attention mechanisms solve in seq2seq models?,"Traditional encoder-decoder models compressed variable-length input into a fixed-size context vector (the encoder's last hidden state), causing information loss on long sequences — a bottleneck problem.
+
+Attention creates learnable shortcuts between the decoder and the entire encoder sequence, allowing the model to dynamically attend to relevant input positions at each decoding step instead of relying on a single compressed vector.",attention seq2seq nlp encoder-decoder,attention_attention_lil_log
+How is the attention context vector computed?,"The context vector is a weighted sum of encoder hidden states:
+
+**c_t = Σ α_{t,i} · h_i**
+
+Where alignment weights α_{t,i} are computed via softmax over alignment scores:
+
+**α_{t,i} = exp(score(s_{t-1}, h_i)) / Σ exp(score(s_{t-1}, h_{i'}))**
+
+The score function measures how strongly output position t should attend to input position i.",attention context-vector alignment-weights math,attention_attention_lil_log
+What are the main attention score functions and how do they differ?,"| Type | Formula | Key Property |
+|---|---|---|
+| **Additive (Bahdanau)** | v_a^T tanh(W_a[s; h]) | Learned MLP alignment |
+| **Dot-Product** | s^T h | Simple, efficient |
+| **Scaled Dot-Product** | s^T h / √n | Prevents softmax saturation |
+| **General (Luong)** | s^T W_a h | Trainable weight matrix |
+| **Location-Based** | softmax(W_a s) | Only depends on decoder state |
+
+Scaled dot-product is standard in Transformers; the 1/√d_k factor prevents large dot products from pushing softmax into low-gradient regions.",attention score-functions bahdanau luong transformers,attention_attention_lil_log
+What is the difference between soft and hard attention?,"**Soft Attention:**
+- Attends to all input positions simultaneously with continuous weights
+- Fully differentiable → trained end-to-end with backprop
+- Computationally expensive for large inputs
+
+**Hard Attention:**
+- Selects a single patch/position at each step
+- Non-differentiable → requires reinforcement learning or variance reduction to train
+- More computationally efficient and interpretable
+- Harder to optimize
+
+**Local attention** is a hybrid: predicts an aligned position, then computes attention over a window around it — differentiable like soft but more efficient.",attention soft-attention hard-attention local-attention,attention_attention_lil_log
+"Explain the Query, Key, Value (QKV) framework in Transformer attention.","The QKV framework abstracts attention as an information retrieval operation:
+
+- **Query (Q):** What we are looking for (e.g., current decoder state)
+- **Key (K):** Index of what is available (e.g., encoder states)
+- **Value (V):** Actual information to retrieve (e.g., encoder states)
+
+**Scaled Dot-Product Attention:**
+
+Attention(Q, K, V) = softmax(QK^T / √d_k) · V
+
+The dot product of Q and K measures relevance; softmax converts to weights; weights are applied to V to produce the output. Scaling by √d_k prevents dot products from growing large and saturating softmax.",transformers attention qkv scaled-dot-product,attention_attention_lil_log
+What is self-attention and why is it useful?,"Self-attention (intra-attention) relates different positions **within the same sequence** to compute a richer representation of each position.
+
+**Key properties:**
+- Each position can attend to all other positions in the sequence
+- Captures long-range dependencies directly (no recurrence needed)
+- Enables parallelization unlike RNNs
+
+**Applications:** Machine reading, abstractive summarization, and as the core building block of Transformers.
+
+In Transformers, self-attention replaces recurrence entirely, allowing the model to build context from the full sequence in a single operation.",self-attention transformers long-range-dependencies nlp,attention_attention_lil_log
+What are Pointer Networks and how do they differ from standard attention?,"Pointer Networks use attention to **select (point to) input positions** rather than blend their representations into a context vector.
+
+**Standard attention:** Produces a weighted combination of encoder states (continuous output)
+
+**Pointer Network:** The attention distribution IS the output — a probability over input indices:
+
+p(c_i | c_1,...,c_{i-1}, x) = softmax(score(s_t; h_i))
+
+**Use cases:** Problems where outputs must be elements of the input sequence:
+- Sorting
+- Traveling Salesman Problem
+- Convex hull
+
+Key insight: The output vocabulary size equals the input length, making it suitable for combinatorial optimization problems.",pointer-networks attention combinatorial-optimization sequence-models,attention_attention_lil_log
+What are Neural Turing Machines (NTMs) and how do they use attention?,"NTMs couple a neural network controller with an external memory matrix using attention-based addressing.
+
+**Components:**
+- **Controller:** Neural network that reads/writes to memory
+- **Memory:** N×M matrix
+- **Read/Write heads:** Use soft attention over memory locations
+
+**Read:** r_t = Σ w_t(i) · M_t(i) — weighted sum of memory rows
+
+**Write:** Erase then add: M̃_t(i) = M_{t-1}(i)[1 - w_t(i)·e_t], then M_t(i) = M̃_t(i) + w_t(i)·a_t
+
+**Addressing mechanisms:**
+1. **Content-based:** Attend by similarity to a key vector
+2. **Interpolation:** Blend with previous attention weights
+3. **Location-based:** Shift attention with learned convolution
+
+This allows NTMs to learn algorithms requiring external memory (e.g., sorting, copying).",ntm attention memory-networks external-memory,attention_attention_lil_log
+What is the scaled dot-product attention formula and why is scaling by √d_k important?,"Formula: Attention(Q,K,V) = softmax(QK^T / √d_k)V
+
+Scaling by √d_k (typically √64 = 8) is important for gradient stability. Without scaling, dot products grow large in magnitude as dimensionality increases, pushing softmax into regions with extremely small gradients (vanishing gradients). Dividing by √d_k keeps the dot products in a reasonable range before softmax.",transformer attention self-attention math,the_illustrated_transformer_jay_alammar_visualizing_machine_learning_one_concept_at_a_time
+"What are the Query (Q), Key (K), and Value (V) vectors in self-attention, and how are they created?","Q, K, V are three different projections of the input embeddings, created by multiplying the embedding by three separate learned weight matrices (W^Q, W^K, W^V).
+
+- Query: What the current token is 'looking for'
+- Key: What each token 'offers' to be matched against
+- Value: The actual content that gets aggregated
+
+Attention scores are computed as similarity between Q and K, then used to take a weighted sum of V vectors.",transformer attention self-attention qkv,the_illustrated_transformer_jay_alammar_visualizing_machine_learning_one_concept_at_a_time
+What is Multi-Head Attention and what are its advantages over single-head attention?,"Multi-Head Attention runs h parallel attention heads, each with independent Q/K/V weight matrices. Outputs are concatenated and projected via W^O:
+
+MultiHead(Q,K,V) = Concat(head_1,...,head_h)W^O
+where head_i = Attention(QW_i^Q, KW_i^K, VW_i^V)
+
+Advantages over single-head:
+1. Allows the model to attend to multiple positions simultaneously
+2. Each head can learn different representation subspaces (e.g., syntax vs. semantics)
+
+Original paper uses h=8 heads.",transformer multi-head-attention architecture,the_illustrated_transformer_jay_alammar_visualizing_machine_learning_one_concept_at_a_time
+"Why do Transformers need positional encoding, and how does sinusoidal encoding work?","Self-attention is permutation-invariant — it has no inherent notion of word order. Positional encodings are added to input embeddings to inject sequential information.
+
+Sinusoidal formula:
+- PE(pos, 2i) = sin(pos / 10000^(2i/d))
+- PE(pos, 2i+1) = cos(pos / 10000^(2i/d))
+
+Sine used for even dimensions, cosine for odd. Benefits:
+- Produces unique encoding per position
+- Allows model to learn relative distances between positions
+- Can extrapolate to sequence lengths unseen during training",transformer positional-encoding architecture,the_illustrated_transformer_jay_alammar_visualizing_machine_learning_one_concept_at_a_time
+How does the Transformer decoder differ from the encoder? What are its three sub-layers?,"The decoder has three sub-layers per layer (vs. two in encoder):
+
+1. **Causal (Masked) Self-Attention**: Same as encoder self-attention, but future positions are masked (-∞ before softmax) to prevent the model from 'peeking' at future tokens during autoregressive generation.
+
+2. **Encoder-Decoder Attention**: Queries come from the decoder, but Keys and Values come from the encoder output. This lets the decoder focus on relevant parts of the input sequence.
+
+3. **Feed-Forward Network**: Same as in encoder, applied independently per position.
+
+Each sub-layer also has residual connections and layer normalization: LayerNorm(x + SubLayer(x)).",transformer decoder architecture masked-attention,the_illustrated_transformer_jay_alammar_visualizing_machine_learning_one_concept_at_a_time
+Why do Transformers outperform RNNs for sequence modeling tasks?,"Key advantages of Transformers over RNNs:
+
+1. **Parallelization**: RNNs process tokens sequentially (each step depends on previous). Transformers compute all positions in parallel via matrix operations → much faster training.
+
+2. **Long-range dependencies**: RNNs struggle with distant dependencies due to vanishing gradients over many steps. Self-attention directly connects any two positions in O(1) operations.
+
+3. **No vanishing gradient over sequence length**: Information doesn't need to pass through many recurrent steps to connect distant tokens.
+
+4. **TPU/GPU efficiency**: Matrix operations in self-attention are highly optimized for modern hardware.",transformer rnn comparison parallelization,the_illustrated_transformer_jay_alammar_visualizing_machine_learning_one_concept_at_a_time
+"What are residual connections and layer normalization in the Transformer, and why are they used?","Each sub-layer (self-attention, feed-forward) in both encoder and decoder wraps its computation with:
+
+**LayerNorm(x + SubLayer(x))**
+
+- **Residual connection (x + SubLayer(x))**: Adds the input directly to the sub-layer output. Facilitates gradient flow during backpropagation (combats vanishing gradients) and allows layers to learn residual corrections rather than full transformations.
+
+- **Layer Normalization**: Normalizes activations across the feature dimension for each sample. Stabilizes training, improves convergence speed, and reduces sensitivity to initialization.",transformer residual-connections layer-norm training,the_illustrated_transformer_jay_alammar_visualizing_machine_learning_one_concept_at_a_time
+What are greedy decoding vs. beam search in Transformer output generation?,"Both are strategies for converting decoder probability distributions into output tokens:
+
+**Greedy Decoding**:
+- At each step, select the single highest-probability token
+- Fast but suboptimal — a locally best choice may lead to a globally poor sequence
+
+**Beam Search**:
+- Maintain top-k (beam width) hypotheses at each step
+- Explores multiple candidate sequences in parallel
+- Selects the sequence with highest overall probability
+- More computationally expensive but typically produces better outputs
+
+Beam search is standard in machine translation; greedy is used when speed is prioritized.",transformer decoding beam-search inference,the_illustrated_transformer_jay_alammar_visualizing_machine_learning_one_concept_at_a_time
